@@ -1,5 +1,13 @@
 import java.nio.file.Paths
 
+def isNewArchitectureEnabled() {
+   return project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
+}
+
+if (isNewArchitectureEnabled()) {
+    apply plugin: 'com.facebook.react'
+}
+
 def resolveModulePath(packageName) {
     def basePath = rootDir.toPath().normalize()
 
@@ -85,11 +93,20 @@ android {
         buildConfigField "Long", "AsyncStorage_db_size", "${dbSizeInMB}L"
         buildConfigField "boolean", "AsyncStorage_useDedicatedExecutor", "${useDedicatedExecutor}"
         buildConfigField "boolean", "AsyncStorage_useNextStorage", "${useNextStorage}"
+        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
     }
     lintOptions {
         abortOnError false
     }
-
+    sourceSets {
+        main {
+            if (isNewArchitectureEnabled()) {
+                java.srcDirs += ['src/newarch']
+            } else {
+                java.srcDirs += ['src/oldarch']
+            }
+        }
+    }
     if (useNextStorage) {
         testOptions {
             unitTests {
@@ -144,3 +161,12 @@ dependencies {
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'  // From node_modules
 }
+
+
+if (isNewArchitectureEnabled()) {
+     react {
+         jsRootDir = file("../codegen/")
+         libraryName = "rnasyncstorage"
+         codegenJavaPackageName = "com.reactnativecommunity.asyncstorage"
+     }
+ }

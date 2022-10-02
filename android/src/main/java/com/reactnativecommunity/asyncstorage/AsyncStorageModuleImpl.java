@@ -32,9 +32,7 @@ import java.util.HashSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-@ReactModule(name = AsyncStorageModule.NAME)
-public final class AsyncStorageModule
-    extends ReactContextBaseJavaModule implements ModuleDataCleaner.Cleanable, LifecycleEventListener {
+public final class AsyncStorageModuleImpl implements ModuleDataCleaner.Cleanable, LifecycleEventListener {
 
   // changed name to not conflict with AsyncStorage from RN repo
   public static final String NAME = "RNC_AsyncSQLiteDBStorage";
@@ -47,19 +45,19 @@ public final class AsyncStorageModule
   private boolean mShuttingDown = false;
 
   private final SerialExecutor executor;
+  private ReactApplicationContext context;
 
-  public AsyncStorageModule(ReactApplicationContext reactContext) {
+  public AsyncStorageModuleImpl(ReactApplicationContext reactContext) {
     this(
       reactContext,
       BuildConfig.AsyncStorage_useDedicatedExecutor
         ? Executors.newSingleThreadExecutor()
         : AsyncTask.THREAD_POOL_EXECUTOR
     );
+    this.context = reactContext;
   }
 
-  @VisibleForTesting
-  AsyncStorageModule(ReactApplicationContext reactContext, Executor executor) {
-    super(reactContext);
+  AsyncStorageModuleImpl(ReactApplicationContext reactContext, Executor executor) {
     // The migration MUST run before the AsyncStorage database is created for the first time.
     AsyncStorageExpoMigration.migrate(reactContext);
 
@@ -69,18 +67,10 @@ public final class AsyncStorageModule
     mReactDatabaseSupplier = ReactDatabaseSupplier.getInstance(reactContext);
   }
 
-  @Override
-  public String getName() {
-    return NAME;
-  }
-
-  @Override
   public void initialize() {
-    super.initialize();
     mShuttingDown = false;
   }
 
-  @Override
   public void onCatalystInstanceDestroy() {
     mShuttingDown = true;
   }
@@ -109,14 +99,13 @@ public final class AsyncStorageModule
    * Given an array of keys, this returns a map of (key, value) pairs for the keys found, and
    * (key, null) for the keys that haven't been found.
    */
-  @ReactMethod
   public void multiGet(final ReadableArray keys, final Callback callback) {
     if (keys == null) {
       callback.invoke(AsyncStorageErrorUtil.getInvalidKeyError(null), null);
       return;
     }
 
-    new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
+    new GuardedAsyncTask<Void, Void>(context) {
       @Override
       protected void doInBackgroundGuarded(Void... params) {
         if (!ensureDatabase()) {
@@ -182,14 +171,13 @@ public final class AsyncStorageModule
    * return AsyncLocalStorageFailure, but all other pairs will have been inserted.
    * The insertion will replace conflicting (key, value) pairs.
    */
-  @ReactMethod
   public void multiSet(final ReadableArray keyValueArray, final Callback callback) {
     if (keyValueArray.size() == 0) {
       callback.invoke();
       return;
     }
 
-    new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
+    new GuardedAsyncTask<Void, Void>(context) {
       @Override
       protected void doInBackgroundGuarded(Void... params) {
         if (!ensureDatabase()) {
@@ -247,14 +235,13 @@ public final class AsyncStorageModule
   /**
    * Removes all rows of the keys given.
    */
-  @ReactMethod
   public void multiRemove(final ReadableArray keys, final Callback callback) {
     if (keys.size() == 0) {
       callback.invoke();
       return;
     }
 
-    new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
+    new GuardedAsyncTask<Void, Void>(context) {
       @Override
       protected void doInBackgroundGuarded(Void... params) {
         if (!ensureDatabase()) {
@@ -299,9 +286,8 @@ public final class AsyncStorageModule
    * Given an array of (key, value) pairs, this will merge the given values with the stored values
    * of the given keys, if they exist.
    */
-  @ReactMethod
   public void multiMerge(final ReadableArray keyValueArray, final Callback callback) {
-    new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
+    new GuardedAsyncTask<Void, Void>(context) {
       @Override
       protected void doInBackgroundGuarded(Void... params) {
         if (!ensureDatabase()) {
@@ -361,9 +347,8 @@ public final class AsyncStorageModule
   /**
    * Clears the database.
    */
-  @ReactMethod
   public void clear(final Callback callback) {
-    new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
+    new GuardedAsyncTask<Void, Void>(context) {
       @Override
       protected void doInBackgroundGuarded(Void... params) {
         if (!mReactDatabaseSupplier.ensureDatabase()) {
@@ -384,9 +369,8 @@ public final class AsyncStorageModule
   /**
    * Returns an array with all keys from the database.
    */
-  @ReactMethod
   public void getAllKeys(final Callback callback) {
-    new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
+    new GuardedAsyncTask<Void, Void>(context) {
       @Override
       protected void doInBackgroundGuarded(Void... params) {
         if (!ensureDatabase()) {
